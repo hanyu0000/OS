@@ -1,5 +1,5 @@
 .vscode/
 build/*
 *.img
-bochs.out
+**/bochs.out
 bochsrc.disk
