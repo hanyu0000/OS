@@ -3,4 +3,6 @@ build/*
 *.img
 **/bochs.out
 **/bochs.bin
+**/*.out
+**/*.bin 
 bochsrc.disk
