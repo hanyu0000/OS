@@ -1,8 +1,5 @@
-;主引导程序 
-;LOADER_BASE_ADDR equ 0xA000 
-;LOADER_START_SECTOR equ 0x2
-SECTION MBR vstart=0x7c00         
-    mov ax,cs      
+SECTION MBR vstart=0x7c00
+    mov ax,cs
     mov ds,ax
     mov es,ax
     mov ss,ax
@@ -46,7 +43,7 @@ SECTION MBR vstart=0x7c00
     mov byte [gs:0x08],'!'
     mov byte [gs:0x09],0xA4
 
-    jmp $		                        ; 通过死循环使程序悬停在此
+    jmp $                               ; 通过死循环使程序悬停在此
 
     times 510-($-$$) db 0
     db 0x55,0xaa
