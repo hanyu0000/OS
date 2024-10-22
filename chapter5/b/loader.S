@@ -109,7 +109,7 @@ p_mode_start:
 
     call setup_page                                     ;创建页目录表的函数,我们的页目录表必须放在1M开始的位置，所以必须在开启保护模式后运行
 
-                                                        ;以下两句是将gdt描述符中视频段描述符中的段基址+0xc0000000
+    ;以下两句是将gdt描述符中视频段描述符中的段基址+0xc0000000
     mov ebx, [gdt_ptr + 2]                              ;ebx中存着GDT_BASE
     or dword [ebx + 0x18 + 4], 0xc0000000
     ;视频段是第3个段描述符,每个描述符是8字节,故0x18 = 24，然后+4，是取出了视频段段描述符的高4字节。然后or操作，段基址最高位+c
@@ -120,11 +120,11 @@ p_mode_start:
 
     mov eax, PAGE_DIR_TABLE_POS                         ; 把页目录地址赋给cr3
     mov cr3, eax
-                                                        
+
     mov eax, cr0                                        ; 打开cr0的pg位(第31位)
     or eax, 0x80000000  
     mov cr0, eax
-                                                      
+
     lgdt [gdt_ptr]                                      ;在开启分页后,用gdt新的地址重新加载
 
     mov byte [gs:160], 'V'                              ;视频段段基址已经被更新,用字符v表示virtual addr
