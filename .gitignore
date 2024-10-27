@@ -3,5 +3,6 @@ build/*
 *.img
 **/bochs.out
 **/bochs.bin
+**/*.o
 **/*.out
 **/*.bin 
