@@ -1,29 +1,29 @@
 %include "boot.inc"
 section loader vstart=LOADER_BASE_ADDR
 
-                                                
-GDT_BASE:                                               ;构建gdt及其内部的描述符
-    dd 0x00000000 
+;构建gdt及其内部的描述符
+GDT_BASE:
+    dd 0x00000000
 	dd 0x00000000
 
-CODE_DESC:  
-    dd 0x0000FFFF 
+CODE_DESC:
+    dd 0x0000FFFF
 	dd DESC_CODE_HIGH4
 
-DATA_STACK_DESC:  
+DATA_STACK_DESC:
     dd 0x0000FFFF
     dd DESC_DATA_HIGH4
 
 VIDEO_DESC: 
-    dd 0x80000007	                                    ;limit=(0xbffff-0xb8000)/4k=0x7
+    dd 0x80000007                                       ;limit=(0xbffff-0xb8000)/4k=0x7
     dd DESC_VIDEO_HIGH4                                 ; 此时dpl已改为0
 
     GDT_SIZE equ $ - GDT_BASE
-    GDT_LIMIT equ GDT_SIZE - 1 
+    GDT_LIMIT equ GDT_SIZE - 1
     times 60 dq 0					                    ; 此处预留60个描述符的空间
     SELECTOR_CODE equ (0x0001<<3) + TI_GDT + RPL0       ; 相当于(CODE_DESC - GDT_BASE)/8 + TI_GDT + RPL0
     SELECTOR_DATA equ (0x0002<<3) + TI_GDT + RPL0	    ; 同上
-    SELECTOR_VIDEO equ (0x0003<<3) + TI_GDT + RPL0	    ; 同上 
+    SELECTOR_VIDEO equ (0x0003<<3) + TI_GDT + RPL0	    ; 同上
 
 total_mem_bytes dd 0				                    ; total_mem_bytes用于保存内存容量,以字节为单位,此位置比较好记。
                                                         ; 当前偏移loader.bin文件头0x200字节,loader.bin的加载地址是0x900,
@@ -35,9 +35,8 @@ gdt_ptr dw GDT_LIMIT                                    ;定义加载进入GDTR�
 ards_buf times 244 db 0                                 ;人工对齐:total_mem_bytes4字节+gdt_ptr6字节+ards_buf244字节+ards_nr2,共256字节
 ards_nr dw 0		                                    ;用于记录ards结构体数量
 
-
 loader_start:
-                                                        ;-------  int 15h eax = 0000E820h ,edx = 534D4150h ('SMAP') 获取内存布局  -------
+;-------  int 15h eax = 0000E820h ,edx = 534D4150h ('SMAP') 获取内存布局  -------
 
     xor ebx, ebx		                                ;第一次调用时，ebx值要为0
     mov edx, 0x534d4150	                                ;edx只赋值一次，循环体中不会改变
@@ -294,7 +293,7 @@ rd_disk_m_32:
 .go_on_read:
     in ax,dx
     mov [ebx],ax                                        ;与rd_disk_m_16相比，就是把这两句的bx改成了ebx
-    add ebx,2		        
+    add ebx,2
                                                         ; 由于在实模式下偏移地址为16位,所以用bx只会访问到0~FFFFh的偏移。
                                                         ; loader的栈指针为0x900,bx为指向的数据输出缓冲区,且为16位，
                                                         ; 超过0xffff后,bx部分会从0开始,所以当要读取的扇区数过大,待写入的地址超过bx的范围时，
