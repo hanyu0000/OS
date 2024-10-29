@@ -1,7 +1,8 @@
-    %include "boot.inc"
-    section loader vstart=LOADER_BASE_ADDR
-    LOADER_STACK_TOP equ LOADER_BASE_ADDR
-    jmp loader_start                              ;loader一进来是一大堆GDT段描述符数据，无法执行，所以要跳过
+%include "boot.inc"
+section loader vstart=LOADER_BASE_ADDR
+LOADER_STACK_TOP equ LOADER_BASE_ADDR
+
+jmp loader_start                              ;loader一进来是一大堆GDT段描述符数据，无法执行，所以要跳过
 
 GDT_BASE:                                         ;构建gdt及其内部的描述符
     dd 0x00000000
