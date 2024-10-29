@@ -18,7 +18,6 @@
                                     ; 下标从0开始，所以0x18=24,0x4f=79
     int 10h                         ; int 10h
 
-    ; 输出字符串:MBR
     mov byte [gs:0x00],'1'
     mov byte [gs:0x01],0xA4
 
@@ -40,13 +39,14 @@
     call rd_disk_m_16               ; 以下读取程序的起始部分（一个扇区）
 
     jmp LOADER_BASE_ADDR
-    ;功能:读取硬盘n个扇区
+;功能:读取硬盘n个扇区
 rd_disk_m_16:
 ; eax=LBA扇区号
 ; ebx=将数据写入的内存地址
 ; ecx=读入的扇区数
     mov esi,eax                     ;备份eax
     mov di,cx                       ;备份cx
+    
     ;读写硬盘:
 
     ;第1步：选择特定通道的寄存器，设置要读取的扇区数
