@@ -1,5 +1,5 @@
-    %include "boot.inc"
-    SECTION MBR vstart=0x7c00
+%include "boot.inc"
+SECTION MBR vstart=0x7c00
     mov ax,cs
     mov ds,ax
     mov es,ax
@@ -39,7 +39,7 @@
   
     jmp LOADER_BASE_ADDR
 
-    ;功能:读取硬盘n个扇区
+;功能:读取硬盘n个扇区
 rd_disk_m_16:
 ; eax=LBA扇区号
 ; ebx=将数据写入的内存地址
