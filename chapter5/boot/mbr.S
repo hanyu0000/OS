@@ -1,62 +1,70 @@
 %include "boot.inc"
-SECTION MBR vstart=0x7c00
-    mov ax,cs
+SECTION MBR vstart=0x7c00               ;起始地址编译为0x7c00
+    mov ax,cs                           ;因为是jmp 0:0x7c00跳转到MBR的，故cs此时为0
+                                        ;ds、es、ss、fs等sreg只能用通用寄存器赋值，本例采用ax赋值
     mov ds,ax
     mov es,ax
     mov ss,ax
     mov fs,ax
-    mov sp,0x7c00
-    mov ax,0xb800
-    mov gs,ax
+    mov sp,0x7c00                       ;初始化栈指针
+    mov ax,0xb800                       ;0xb800为文本显示起始区
+    mov gs,ax                           ;gs = ax 充当段基址的作用
 
-    mov ax, 0600h
-    mov bx, 0700h
-    mov cx, 0
-    mov dx, 184fh
+    mov ax,0x600
+    mov bx,0x700
+    mov cx,0
+    mov dx,0x184f
 
-    int 10h
+    int 0x10                            ;调用BIOS中断，实现清屏
 
-    ; 输出字符串
-    mov byte [gs:0x00],'h'
-    mov byte [gs:0x01],0xA4
+    ;新增功能：直接操作显存部分
+    mov byte [gs:0x00],'H'              ;低位字节储存ASCII字符，小端储存内存顺序相反。
+                                        ;用关键词byte指定操作数所占空间，因为[gs:0x00]和'H'所占空间均为不定的，所以需要自己指定空间大小
+    mov byte [gs:0x01],0xA4             ;背景储存在第二个字节，含字符与背景属性。A表示绿色背景闪烁，4表示前景色为红色
 
-    mov byte [gs:0x02],'a'
+    mov byte [gs:0x02],'i'
     mov byte [gs:0x03],0xA4
 
-    mov byte [gs:0x04],'n'
-    mov byte [gs:0x05],0xA4	        ;A表示绿色背景闪烁，4表示前景色为红色
+    mov byte [gs:0x04],'!'
+    mov byte [gs:0x05],0xA4
 
-    mov byte [gs:0x06],'y'
+    mov byte [gs:0x06],'h'
     mov byte [gs:0x07],0xA4
 
-    mov byte [gs:0x08],'u'
+    mov byte [gs:0x08],'a'
     mov byte [gs:0x09],0xA4
-	 
-    mov eax,LOADER_START_SECTOR	    ; 起始扇区lba地址
-    mov bx,LOADER_BASE_ADDR         ; 写入的地址
-    mov cx,4                        ; 待读入的扇区数
-    call rd_disk_m_16               ; 以下读取程序的起始部分（一个扇区）
-  
-    jmp LOADER_BASE_ADDR
 
-; -------------------------------------------------------------------------------
-;读取硬盘n个扇区
+    mov byte [gs:0x0A],'n'
+    mov byte [gs:0x0B],0xA4
+
+    mov byte [gs:0x0C],'y'
+    mov byte [gs:0x0D],0xA4
+
+    mov byte [gs:0x0E],'u'
+    mov byte [gs:0x0F],0xA4
+
+    mov eax,LOADER_START_SECTOR        ; 起始扇区lba地址
+    mov bx,LOADER_BASE_ADDR            ; 写入的地址
+    mov cx,4                           ; 待读入的扇区数
+    call rd_disk_m_16                  ; 以下读取程序的起始部分（一个扇区）
+
+    jmp LOADER_BASE_ADDR
+;-----------------------------------
+;功能：读取硬盘n个扇区
 rd_disk_m_16:
-; eax=LBA扇区号
-; ebx=将数据写入的内存地址
-; ecx=读入的扇区数
+                                    ; eax=LBA 扇区号
+                                    ; bx=将数据写入的内存地址
+                                    ; cx=读入的扇区数
     mov esi,eax                     ;备份eax
     mov di,cx                       ;备份cx
-    ;读写硬盘:
-
-    ;第1步：选择特定通道的寄存器，设置要读取的扇区数
+    ;读写硬盘：
+;第1步：设置要读取的扇区数
     mov dx,0x1f2
     mov al,cl
     out dx,al                       ;读取的扇区数
-
     mov eax,esi                     ;恢复ax
 
-    ;第2步：在特定通道寄存器中放入要读取扇区的地址，将LBA地址存入0x1f3 ~ 0x1f6
+;第2步：将LBA地址存入0x1f3~0x1f6
     ;LBA地址7~0位写入端口0x1f3
     mov dx,0x1f3
     out dx,al
@@ -74,17 +82,17 @@ rd_disk_m_16:
 
     shr eax,cl
     and al,0x0f                     ;lba第24~27位
-    or al,0xe0                      ; 设置7～4位为1110,表示lba模式
+    or al,0xe0                      ;设置7~4位为1110，表示lba模式
     mov dx,0x1f6
     out dx,al
 
-    ;第3步：向0x1f7端口写入读命令，0x20 
+;第3步：向0x1f7端口写入读命令,0x20
     mov dx,0x1f7
     mov al,0x20
     out dx,al
 
-    ;第4步：检测硬盘状态
-.not_ready:
+;第4步：检测硬盘状态
+  .not_ready:
     ;同一端口，写时表示写入命令字，读时表示读入硬盘状态
     nop
     in al,dx
@@ -92,19 +100,18 @@ rd_disk_m_16:
     cmp al,0x08
     jnz .not_ready                  ;若未准备好，继续等
 
-    ;第5步：从0x1f0端口读数据
-    mov ax, di                      ;di当中存储的是要读取的扇区数
-    mov dx, 256                     ;每个扇区512字节，一次读取两个字节
-                                    ;所以一个扇区就要读取256次，与扇区数相乘，就等得到总读取次数
-    mul dx                          ;8位乘法与16位乘法知识查看书p133,注意：16位乘法会改变dx的值！！！！
-    mov cx, ax	                    ; 得到了要读取的总次数，然后将这个数字放入cx中
-    mov dx, 0x1f0
-.go_on_read:
+;第5步：从0x1f0端口读数据
+    mov ax,di
+    mov dx,256
+    mul dx
+    mov cx,ax                       ;di为要读取的扇区数
+    mov dx,0x1f0
+  .go_on_read:
     in ax,dx
     mov [bx],ax
     add bx,2
     loop .go_on_read
     ret
 
-    times 510-($-$$) db 0
+    times 510-($-$$) db 0           ; 将512B的剩余部分填充为0
     db 0x55,0xaa
