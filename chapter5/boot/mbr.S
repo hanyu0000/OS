@@ -1,14 +1,13 @@
 %include "boot.inc"
 SECTION MBR vstart=0x7c00               ;起始地址编译为0x7c00
-    mov ax,cs                           ;因为是jmp 0:0x7c00跳转到MBR的，故cs此时为0
-                                        ;ds、es、ss、fs等sreg只能用通用寄存器赋值，本例采用ax赋值
+    mov ax,cs
     mov ds,ax
     mov es,ax
     mov ss,ax
     mov fs,ax
-    mov sp,0x7c00                       ;初始化栈指针
-    mov ax,0xb800                       ;0xb800为文本显示起始区
-    mov gs,ax                           ;gs = ax 充当段基址的作用
+    mov sp,0x7c00
+    mov ax,0xb800
+    mov gs,ax
 
     mov ax,0x600
     mov bx,0x700
@@ -18,37 +17,27 @@ SECTION MBR vstart=0x7c00               ;起始地址编译为0x7c00
     int 0x10                            ;调用BIOS中断，实现清屏
 
     ;新增功能：直接操作显存部分
-    mov byte [gs:0x00],'H'              ;低位字节储存ASCII字符，小端储存内存顺序相反。
-                                        ;用关键词byte指定操作数所占空间，因为[gs:0x00]和'H'所占空间均为不定的，所以需要自己指定空间大小
-    mov byte [gs:0x01],0xA4             ;背景储存在第二个字节，含字符与背景属性。A表示绿色背景闪烁，4表示前景色为红色
+    mov byte [gs:0x00],'1'
+    mov byte [gs:0x01],0xA4
 
-    mov byte [gs:0x02],'i'
+    mov byte [gs:0x02],' '
     mov byte [gs:0x03],0xA4
 
-    mov byte [gs:0x04],'!'
-    mov byte [gs:0x05],0xA4
+    mov byte [gs:0x04],'M'
+    mov byte [gs:0x05],0xA4            ;A表示绿色背景闪烁，4表示前景色为红色
 
-    mov byte [gs:0x06],'h'
+    mov byte [gs:0x06],'B'
     mov byte [gs:0x07],0xA4
 
-    mov byte [gs:0x08],'a'
+    mov byte [gs:0x08],'R'
     mov byte [gs:0x09],0xA4
-
-    mov byte [gs:0x0A],'n'
-    mov byte [gs:0x0B],0xA4
-
-    mov byte [gs:0x0C],'y'
-    mov byte [gs:0x0D],0xA4
-
-    mov byte [gs:0x0E],'u'
-    mov byte [gs:0x0F],0xA4
 
     mov eax,LOADER_START_SECTOR        ; 起始扇区lba地址
     mov bx,LOADER_BASE_ADDR            ; 写入的地址
     mov cx,4                           ; 待读入的扇区数
     call rd_disk_m_16                  ; 以下读取程序的起始部分（一个扇区）
 
-    jmp LOADER_BASE_ADDR
+    jmp LOADER_BASE_ADDR + 0x300
 ;-----------------------------------
 ;功能：读取硬盘n个扇区
 rd_disk_m_16:

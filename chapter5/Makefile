@@ -8,8 +8,8 @@ BOCHS = bochs
 # 定义路径和选项
 BOOT_DIR = boot
 KERNEL_DIR = kernel
-DISK_IMG = /home/hanyu/bochs/HD60.img
-BOCHSRC = /home/hanyu/bochs/bochsrc.disk
+DISK_IMG = /home/hanyu/OS/HD60.img
+BOCHSRC = /home/hanyu/OS/bochsrc.disk
 NASM_INCLUDE = $(BOOT_DIR)/include/
 
 # 默认目标
