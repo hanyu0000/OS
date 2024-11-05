@@ -1,20 +1,19 @@
 %include "boot.inc"
 SECTION MBR vstart=0x7c00
+    ;使段寄存器都指向引导扇区的基址0x7C00
     mov ax,cs
     mov ds,ax
     mov es,ax
     mov ss,ax
     mov fs,ax
-    mov sp,0x7c00
+    mov sp,0x7c00;设置栈指针SP为0x7C00，从这里开始分配栈
     mov ax,0xb800
     mov gs,ax
 
     mov ax, 0600h
     mov bx, 0700h
-    mov cx, 0                       ; 左上角: (0, 0)
-    mov dx, 184fh                   ; 右下角: (80,25),
-                                    ; 因为VGA文本模式中，一行只能容纳80个字符,共25行。
-                                    ; 下标从0开始，所以0x18=24,0x4f=79
+    mov cx, 0
+    mov dx, 184fh
     int 10h                         ; int 10h
 
 ; 输出字符串:1 MBR
@@ -26,7 +25,6 @@ SECTION MBR vstart=0x7c00
 
     mov byte [gs:0x04],'M'
     mov byte [gs:0x05],0xA4         ;A表示绿色背景闪烁，4表示前景色为红色
-
     mov byte [gs:0x06],'B'
     mov byte [gs:0x07],0xA4
 
@@ -39,17 +37,14 @@ SECTION MBR vstart=0x7c00
     call rd_disk_m_16               ; 以下读取程序的起始部分（一个扇区）
   
     jmp LOADER_BASE_ADDR + 0x300
-;-------------------------------------------------------------------------------
+
 ;功能:读取硬盘n个扇区
 rd_disk_m_16:
-;-------------------------------------------------------------------------------
-                    ; eax=LBA扇区号
-                    ; ebx=将数据写入的内存地址
-                    ; ecx=读入的扇区数
+    ;eax=LBA扇区号
+    ;ebx=将数据写入的内存地址
+    ;ecx=读入的扇区数
     mov esi,eax                     ;备份eax
     mov di,cx                       ;备份cx
-    ;读写硬盘:
-
 ;第1步：选择特定通道的寄存器，设置要读取的扇区数
     mov dx,0x1f2
     mov al,cl
@@ -75,7 +70,7 @@ rd_disk_m_16:
     mov dx,0x1f6
     out dx,al
 
-;第3步：向0x1f7端口写入读命令，0x20 
+;第3步：向0x1f7端口写入读命令:0x20
     mov dx,0x1f7
     mov al,0x20
     out dx,al
@@ -92,8 +87,8 @@ rd_disk_m_16:
 ;第5步：从0x1f0端口读数据
     mov ax, di                      ;di当中存储的是要读取的扇区数
     mov dx, 256                     ;每个扇区512字节，一次读取两个字节，所以一个扇区就要读取256次，与扇区数相乘，就等得到总读取次数
-    mul dx                          ;8位乘法与16位乘法知识查看书p133,注意：16位乘法会改变dx的值！！！！
-    mov cx, ax                      ; 得到了要读取的总次数，然后将这个数字放入cx中
+    mul dx                          ;6位乘法会改变dx的值！！！！
+    mov cx, ax                      ;得到了要读取的总次数，然后将这个数字放入cx中
     mov dx, 0x1f0
 .go_on_read:
     in ax,dx

@@ -4,13 +4,11 @@ GCC = gcc
 LD = ld
 DD = dd
 BOCHS = bochs
-
-# 路径和选项
+DISK_IMG = /home/hanyu/OS/HD60.img
+BOCHSRC = /home/hanyu/OS/bochsrc.disk
 BOOT_DIR = boot
 LIB_DIR = lib/kernel
 KERNEL_DIR = kernel
-DISK_IMG = /home/hanyu/bochs/HD60.img
-BOCHSRC = /home/hanyu/bochs/bochsrc.disk
 NASM_INCLUDE = $(BOOT_DIR)/include/
 
 # 默认目标

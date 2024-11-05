@@ -1,6 +1,5 @@
 #ifndef __LIB_STDINT_H
 #define __LIB_STDINT_H
-//定义数据结构类型
 typedef signed char int8_t;
 typedef signed short int int16_t;
 typedef signed int int32_t;
