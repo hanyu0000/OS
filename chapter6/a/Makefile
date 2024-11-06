@@ -22,7 +22,7 @@ mbr: $(BOOT_DIR)/mbr.S
 # 编译 loader
 loader: $(BOOT_DIR)/loader.S
 	$(NASM) -I $(NASM_INCLUDE) -o $(BOOT_DIR)/loader.bin $(BOOT_DIR)/loader.S
-	$(DD) if=$(BOOT_DIR)/loader.bin of=$(DISK_IMG) bs=512 count=2 seek=2 conv=notrunc
+	$(DD) if=$(BOOT_DIR)/loader.bin of=$(DISK_IMG) bs=512 count=4 seek=2 conv=notrunc
 
 # 编译 print
 print: $(LIB_DIR)/print.S
