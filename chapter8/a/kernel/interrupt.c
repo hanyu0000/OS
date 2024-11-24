@@ -4,14 +4,14 @@
 #include "io.h"
 #include "print.h"
 
-#define PIC_M_CTRL 0x20       // 这里用的可编程中断控制器是8259A,主片的控制端口是0x20
-#define PIC_M_DATA 0x21       // 主片的数据端口是0x21
-#define PIC_S_CTRL 0xa0       // 从片的控制端口是0xa0
-#define PIC_S_DATA 0xa1       // 从片的数据端口是0xa1
+#define PIC_M_CTRL 0x20        //这里用的可编程中断控制器是8259A,主片的控制端口是0x20
+#define PIC_M_DATA 0x21        //主片的数据端口是0x21
+#define PIC_S_CTRL 0xa0        //从片的控制端口是0xa0
+#define PIC_S_DATA 0xa1        //从片的数据端口是0xa1
 
 #define IDT_DESC_CNT 0x21      //支持的中断描述符个数33
 
-#define EFLAGS_IF   0x00000200       // eflags寄存器中的if位为1
+#define EFLAGS_IF   0x00000200 //eflags寄存器中的if位为1
 #define GET_EFLAGS(EFLAG_VAR) asm volatile("pushfl; popl %0" : "=g" (EFLAG_VAR))
 //pop到eflags_var所在内存中，该约束自然用表示内存的字母，但内联汇编中没有专门表示约束内存的字母，所以只能用g代表可以是任意寄存器，内存或立即数
 
@@ -24,14 +24,14 @@ struct gate_desc {
    uint16_t    func_offset_high_word;       //函数地址高字
 };
 
-// 静态函数声明,非必须
+//静态函数声明,非必须
 static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler function);
 static struct gate_desc idt[IDT_DESC_CNT];               //中断门描述符（结构体）数组，名字叫idt
 
-extern intr_handler intr_entry_table[IDT_DESC_CNT];      //引入kernel.s中定义好的中断处理函数地址数组，intr_handler就是void* 表明是一般地址类型
+extern intr_handler intr_entry_table[IDT_DESC_CNT];      //引入kernel.s中定义好的中断处理函数地址数组，intr_handler就是void*表明是一般地址类型
 
 char* intr_name[IDT_DESC_CNT];                           //存储中断/异常的名字
-intr_handler idt_table[IDT_DESC_CNT];                    // 定义中断处理程序数组.在kernel.S中定义的intrXXentry只是中断处理程序的入口,最终调用的是ide_table中的处理程序
+intr_handler idt_table[IDT_DESC_CNT];                    //定义中断处理程序数组.在kernel.S中定义的intrXXentry只是中断处理程序的入口,最终调用的是ide_table中的处理程序
 
 //初始化可编程中断控制器8259A
 static void pic_init(void) {
@@ -41,10 +41,10 @@ static void pic_init(void) {
    outb (PIC_M_DATA, 0x04);   // ICW3: IR2接从片. 
    outb (PIC_M_DATA, 0x01);   // ICW4: 8086模式, 正常EOI
    /* 初始化从片 */
-   outb (PIC_S_CTRL, 0x11);	// ICW1: 边沿触发,级联8259, 需要ICW4.
-   outb (PIC_S_DATA, 0x28);	// ICW2: 起始中断向量号为0x28,也就是IR[8-15] 为 0x28 ~ 0x2F.
-   outb (PIC_S_DATA, 0x02);	// ICW3: 设置从片连接到主片的IR2引脚
-   outb (PIC_S_DATA, 0x01);	// ICW4: 8086模式, 正常EOI
+   outb (PIC_S_CTRL, 0x11);   // ICW1: 边沿触发,级联8259, 需要ICW4.
+   outb (PIC_S_DATA, 0x28);   // ICW2: 起始中断向量号为0x28,也就是IR[8-15] 为 0x28 ~ 0x2F.
+   outb (PIC_S_DATA, 0x02);   // ICW3: 设置从片连接到主片的IR2引脚
+   outb (PIC_S_DATA, 0x01);   // ICW4: 8086模式, 正常EOI
    /* 打开主片上IR0,也就是目前只接受时钟产生的中断 */
    outb (PIC_M_DATA, 0xfe);
    outb (PIC_S_DATA, 0xff);
@@ -53,7 +53,7 @@ static void pic_init(void) {
 }
 
 //此函数用于将传入的中断门描述符与中断处理函数建立映射，三个参数：中断门描述符地址，属性，中断处理函数地址
-static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler function) { 
+static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler function) {
    p_gdesc->func_offset_low_word = (uint32_t)function & 0x0000FFFF;
    p_gdesc->selector = SELECTOR_K_CODE;
    p_gdesc->dcount = 0;
@@ -64,28 +64,26 @@ static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler 
 //属性字段，中断处理函数的地址
 static void idt_desc_init(void) {
    int i;
-   for (i = 0; i < IDT_DESC_CNT; i++) {
+   for (i = 0; i < IDT_DESC_CNT; i++)
       make_idt_desc(&idt[i], IDT_DESC_ATTR_DPL0, intr_entry_table[i]); 
-   }
    put_str("   idt_desc_init done\n");
 }
-/* 通用的中断处理函数,用于初始化,一般用在异常出现时的处理 */
+//通用的中断处理函数,用于初始化,一般用在异常出现时的处理
 static void general_intr_handler(uint8_t vec_nr) {
-   if (vec_nr == 0x27 || vec_nr == 0x2f) {	//伪中断向量，无需处理。详见书p337
+   if (vec_nr == 0x27 || vec_nr == 0x2f)        //伪中断向量，无需处理
       return;
-   }
    put_str("int vector: 0x");
    put_int(vec_nr);
    put_char('\n');
 }
 
-/* 完成一般中断处理函数注册及异常名称注册 */
+//完成一般中断处理函数注册及异常名称注册
 static void exception_init(void) {
    int i;
    for (i = 0; i < IDT_DESC_CNT; i++) {//idt_table数组中的函数是在进入中断后根据中断向量号调用的,见kernel/kernel.S的call [idt_table + %1*4]
-      idt_table[i] = general_intr_handler;                // 默认为general_intr_handler。
-                                                          // 以后会由register_handler来注册具体处理函数。
-      intr_name[i] = "unknown";                           // 先统一赋值为unknown
+      idt_table[i] = general_intr_handler;                //默认为general_intr_handler
+                                                          //以后会由register_handler来注册具体处理函数
+      intr_name[i] = "unknown";                           //先统一赋值为unknown
    }
    intr_name[0] = "#DE Divide Error";
    intr_name[1] = "#DB Debug Exception";
@@ -110,7 +108,6 @@ static void exception_init(void) {
 
 }
 
-
 //获取当前中断状态
 enum intr_status intr_get_status() {
    uint32_t eflags = 0;
@@ -126,7 +123,7 @@ enum intr_status intr_enable() {
       return old_status;
    } else {
       old_status = INTR_OFF;
-      asm volatile("sti"); // 开中断,sti指令将IF位置1
+      asm volatile("sti"); //开中断,sti指令将IF位置1
       return old_status;
    }
 }

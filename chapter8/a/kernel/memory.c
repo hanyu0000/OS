@@ -6,29 +6,28 @@
 
 #define PG_SIZE 4096
 #define MEM_BITMAP_BASE 0xc009a000
-// 这个地址是位图的起始地址，1MB内存布局中，9FBFF是最大一段可用区域的边界，而我们计划这个可用空间最后的位置将来用来放PCB而PCB占用内存是一个自然页，所以起始地址必须是0xxxx000这种形式，离0x9fbff最近的符合这个形式的地址是0x9f000。我们又为了将来可能的拓展，所以让位图可以支持管理512MB的内存空间，所以预留位图大小为16KB，也就是4页，所以选择0x9a000作为位图的起始地址。
+//这个地址是位图的起始地址，1MB内存布局中，9FBFF是最大一段可用区域的边界，而我们计划这个可用空间最后的位置将来用来放PCB而PCB占用内存是一个自然页，所以起始地址必须是0xxxx000这种形式，离0x9fbff最近的符合这个形式的地址是0x9f000。我们又为了将来可能的拓展，所以让位图可以支持管理512MB的内存空间，所以预留位图大小为16KB，也就是4页，所以选择0x9a000作为位图的起始地址
 
 #define K_HEAP_START 0xc0100000
-// 定义内核堆区起始地址，堆区就是用来进行动态内存分配的地方，系统内核运行在c00000000开始的1MB虚拟地址空间，所以自然要跨过这个空间，堆区的起始地址并没有跨过256个页表，没关系，反正使用虚拟地址最终都会被我们的页表转换为物理地址，我们建立物理映射的时候，跳过256个页表就行了
+//定义内核堆区起始地址，堆区就是用来进行动态内存分配的地方，系统内核运行在c00000000开始的1MB虚拟地址空间，所以自然要跨过这个空间，堆区的起始地址并没有跨过256个页表，没关系，反正使用虚拟地址最终都会被我们的页表转换为物理地址，我们建立物理映射的时候，跳过256个页表就行
 
-// 核心数据结构，物理内存池，生成两个实例用于管理内核物理内存池和用户物理内存池
+//核心数据结构，物理内存池，生成两个实例用于管理内核物理内存池和用户物理内存池
 struct pool {
-    struct bitmap pool_bitmap;  // 使用位图结构，用于管理物理内存
-    uint32_t phy_addr_start;    // 管理物理内存起始地址
-    uint32_t pool_size;         // 字节容量
+    struct bitmap pool_bitmap;  //使用位图结构，用于管理物理内存
+    uint32_t phy_addr_start;    //管理物理内存起始地址
+    uint32_t pool_size;         //字节容量
 };
 
 struct pool kernel_pool, user_pool;
-// 为kernel与user分别建立物理内存池，让用户进程只能从user内存池获得新的内存空间，防止用户申请完所有可用空间，内核就不能申请
-struct virtual_addr kernel_pool;
-// 管理内核虚拟地址空间
+//为kernel与user分别建立物理内存池，让用户进程只能从user内存池获得新的内存空间，防止用户申请完所有可用空间，内核就不能申请
+struct virtual_addr kernel_vaddr;
+//管理内核虚拟地址空间
 
-// 初始化内核物理内存池与用户物理内存池
+//初始化内核物理内存池与用户物理内存池
 static void mem_pool_init(uint32_t all_mem) {
     put_str("    men_pool_init start\n");
     uint32_t page_table_size = PG_SIZE * 256;
     //页表大小=1页的页目录表+第0和第768个页目录项指向同一个页表+第769~1022个页目录项共指向254个页表,共256个页表
-    uint32_t used_mem = page_table_size + 0x100000;
     uint32_t used_mem = page_table_size + 0x100000;//已使用内存 = 1MB + 256个页表
     uint32_t free_mem = all_mem - used_mem;
     uint16_t all_free_pages = free_mem /  PG_SIZE;//将所有可用内存转换为页的数量，内存分配以页为单位，丢掉的内存不考虑
@@ -61,7 +60,7 @@ static void mem_pool_init(uint32_t all_mem) {
     // 32M内存占用的位图是2k.内核内存池的位图先定在MEM_BITMAP_BASE(0xc009a000)处
     kernel_pool.pool_bitmap.bits = (void*)MEM_BITMAP_BASE;//管理内核使用的物理内存池的位图起始地址
 
-    /* 用户内存池的位图紧跟在内核内存池位图之后 */
+    //用户内存池的位图紧跟在内核内存池位图之后
     user_pool.pool_bitmap.bits = (void*)(MEM_BITMAP_BASE + kbm_length);//管理用户使用的物理内存池的位图起始地址
     /******************** 输出内存池信息 **********************/
     put_str("      kernel_pool_bitmap_start:");
@@ -79,11 +78,11 @@ static void mem_pool_init(uint32_t all_mem) {
     bitmap_init(&kernel_pool.pool_bitmap);
     bitmap_init(&user_pool.pool_bitmap);
 
-    /* 下面初始化内核虚拟地址的位图,按实际物理内存大小生成数组。*/
+    //下面初始化内核虚拟地址的位图,按实际物理内存大小生成数组
     kernel_vaddr.vaddr_bitmap.btmp_bytes_len = kbm_length;
     //赋值给管理内核可以动态使用的虚拟地址池（堆区）的位图长度，其大小与管理内核可使用的物理内存池位图长度相同，因为虚拟内存最终都要转换为真实的物理内存，可用虚拟内存大小超过可用物理内存大小在我们这个简单操作系统无意义（现代操作系统中有意义，因为我们可以把真实物理内存不断换出，回收，来让可用物理内存变相变大)
 
-    /* 位图的数组指向一块未使用的内存,目前定位在内核内存池和用户内存池之外*/
+    //位图的数组指向一块未使用的内存,目前定位在内核内存池和用户内存池之外
     kernel_vaddr.vaddr_bitmap.bits = (void*)(MEM_BITMAP_BASE + kbm_length + ubm_length);
     //赋值给管理内核可以动态使用的虚拟内存池（堆区）的位图起始地址
 
@@ -93,7 +92,7 @@ static void mem_pool_init(uint32_t all_mem) {
 }
 
 //在pf表示的虚拟内存池中申请pg_cnt个虚拟页,成功则返回虚拟页的起始地址, 失败则返回NULL
-static void* vaddr_get(enum pool_falgs pf,uint32_t pg_cnt){
+static void* vaddr_get(enum pool_flags pf,uint32_t pg_cnt){
     int vaddr_start = 0, bit_idx_start = -1;
     uint32_t cnt = 0;
     if(pf == PF_KERNEL){

@@ -1,59 +1,69 @@
-# 变量定义
-NASM = nasm
-GCC = gcc
+# 定义变量
+AS = nasm
+CC = gcc
 LD = ld
 DD = dd
-BOCHS = bochs
-IMG = /home/hanyu/OS/HD60.img
-
-# 编译参数
-NASMFLAGS = -I boot/include/
-GCCFLAGS = -m32 -I lib/kernel/ -I lib/ -I kernel/ -c -fno-builtin -fno-stack-protector
+ASFLAGS = -f elf
+CFLAGS = -m32 -I lib/kernel/ -I lib/ -I kernel/ -fno-builtin -fno-stack-protector
 LDFLAGS = -m elf_i386 -Ttext 0xc0001500 -e main
 
 # 文件路径
-MBR = boot/mbr.bin
-LOADER = boot/loader.bin
-KERNEL_BIN = build/kernel.bin
-BOCHSRC = /home/hanyu/OS/bochsrc.disk
+BOOT_DIR = boot
+BUILD_DIR = build
+DEVICE_DIR = device
+KERNEL_DIR = kernel
+LIB_DIR = lib
+IMG = /home/hanyu/OS/HD60.img
 
-# 编译和链接目标文件
-OBJ = build/main.o build/init.o build/interrupt.o build/print.o build/kernel.o build/timer.o
+# 目标文件
+KERNEL_OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
+              $(BUILD_DIR)/print.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/timer.o \
+              $(BUILD_DIR)/debug.o $(BUILD_DIR)/memory.o $(BUILD_DIR)/bitmap.o \
+			  $(BUILD_DIR)/string.o
 
-.PHONY: all clean run bochs
-
+# 默认目标
 all: $(IMG)
 
-# 编译MBR
-$(MBR): boot/mbr.S
-	$(NASM) $(NASMFLAGS) -o $@ $<
+# 编译 MBR 和 Loader
+$(BOOT_DIR)/mbr.bin: $(BOOT_DIR)/mbr.S
+	$(AS) -I $(BOOT_DIR)/include/ -o $@ $<
 
-# 编译Loader
-$(LOADER): boot/loader.S
-	$(NASM) $(NASMFLAGS) -o $@ $<
+$(BOOT_DIR)/loader.bin: $(BOOT_DIR)/loader.S
+	$(AS) -I $(BOOT_DIR)/include/ -o $@ $<
 
-# 编译内核模块
-build/%.o: %.c
-	$(GCC) $(GCCFLAGS) -o $@ $<
+# 编译内核源文件
+$(BUILD_DIR)/%.o: $(KERNEL_DIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-# 编译汇编内核模块
-build/%.o: %.S
-	$(NASM) -f elf -o $@ $<
+$(BUILD_DIR)/%.o: $(DEVICE_DIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(LIB_DIR)/kernel/%.S
+	$(AS) $(ASFLAGS) -o $@ $<
+
+$(BUILD_DIR)/%.o: $(LIB_DIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/bitmap.o: $(LIB_DIR)/kernel/bitmap.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/kernel.o: $(KERNEL_DIR)/kernel.S
+	$(AS) $(ASFLAGS) -o $@ $<
 
 # 链接内核
-$(KERNEL_BIN): $(OBJ)
-	$(LD) $(LDFLAGS) -o $@ $(OBJ)
+$(BUILD_DIR)/kernel.bin: $(KERNEL_OBJS)
+	$(LD) $(LDFLAGS) -o $@ $^
 
-# 将 MBR、Loader 和内核写入到镜像文件
-$(IMG): $(MBR) $(LOADER) $(KERNEL_BIN)
-	$(DD) if=$(MBR) of=$(IMG) bs=512 count=1 conv=notrunc
-	$(DD) if=$(LOADER) of=$(IMG) bs=512 count=4 seek=2 conv=notrunc
-	$(DD) if=$(KERNEL_BIN) of=$(IMG) bs=512 count=200 seek=9 conv=notrunc
+# 写入磁盘镜像
+$(IMG): $(BOOT_DIR)/mbr.bin $(BOOT_DIR)/loader.bin $(BUILD_DIR)/kernel.bin
+	$(DD) if=$(BOOT_DIR)/mbr.bin of=$(IMG) bs=512 count=1 conv=notrunc
+	$(DD) if=$(BOOT_DIR)/loader.bin of=$(IMG) bs=512 count=4 seek=2 conv=notrunc
+	$(DD) if=$(BUILD_DIR)/kernel.bin of=$(IMG) bs=512 count=200 seek=9 conv=notrunc
 
-# 运行 bochs
-bochs: $(IMG)
-	$(BOCHS) -f $(BOCHSRC) -q
+# 启动 Bochs 模拟器
+bochs:
+	bochs -f /home/hanyu/OS/bochsrc.disk -q
 
 # 清理生成的文件
 clean:
-	rm -f boot/*.bin build/*.o $(KERNEL_BIN)
+	rm -f $(BUILD_DIR)/*.o $(BUILD_DIR)/kernel.bin $(BOOT_DIR)/*.bin
