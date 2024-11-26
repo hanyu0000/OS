@@ -14,4 +14,6 @@ keyboard:keymap=/usr/share/bochs/keymaps/x11-pc-us.map
 
 ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14 
 
-ata0-master: type=disk, path="/home/hanyu/bochs/HD60.img", mode=flat
+ata0-master: type=disk, path="/home/hanyu/OS/HD60.img", mode=flat
+
+magic_break: enabled=1
