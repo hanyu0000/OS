@@ -1,6 +1,7 @@
 #ifndef __THREAD_THREAD_H
 #define __THREAD_THREAD_H
 #include "stdint.h"
+#include "list.h"
 
 //定义一种thread_fun的函数类型，返回值是空，参数是一个地址(用来指向自己的参数)
 //这样定义，这个类型就能够具有很大的通用性，很多函数都是这个类型
@@ -75,9 +76,20 @@ struct task_struct {
     enum task_status status;
     uint8_t priority;               //线程优先级
     char name[16];
+
+    uint8_t ticks;                  //线程允许上处理器运行还剩下的滴答值，因为priority不能改变，所以要在其之外另行定义一个值来倒计时
+    uint32_t elapsed_ticks;         //此任务自上cpu运行后至今占用了多少cpu嘀嗒数, 也就是此任务执行了多久
+    struct list_elem general_tag;   //general_tag的作用是用于线程在一般的队列(如就绪队列或者等待队列)中的结点
+    struct list_elem all_list_tag;  //all_list_tag的作用是用于线程队列thread_all_list（这个队列用于管理所有线程）中的结点
+    uint32_t* pgdir;                //进程自己页表的虚拟地址
+
     uint32_t stack_magic;           //栈的边界标记，用于检测栈的溢出
 };
 void thread_create(struct task_struct* pthread, thread_func function, void* func_arg);
 void init_thread(struct task_struct* pthread, char* name, int prio);
 struct task_struct* thread_start(char* name, int prio, thread_func function, void* func_arg);
+
+struct task_struct* running_thread(void);
+void schedule(void);
+void thread_init(void);
 #endif
