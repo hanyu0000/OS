@@ -2,8 +2,8 @@
 #include "io.h"
 #include "print.h"
 
-#include "interrupt.h"
-#include "thread.h"
+#include "../kernel/interrupt.h"
+#include "../thread/thread.h"
 #include "debug.h"
 
 #define IRQ0_FREQUENCY      100            //定义我们想要的中断发生频率，100HZ
@@ -35,7 +35,7 @@ static void frequency_set(uint8_t counter_port, \
    outb(counter_port, (uint8_t) (counter_value>>8) );
 }
 
-//时钟中断处理函数'
+//时钟中断处理函数
 static void intr_timer_handler(void){
     struct task_struct* cur_thread = running_thread();
 

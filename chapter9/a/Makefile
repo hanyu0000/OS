@@ -1,98 +1,89 @@
-#定义一大堆变量，实质就是将需要多次重复用到的语句定义一个变量方便使用与替换
-BUILD_DIR=./build
-ENTRY_POINT=0xc0001500
-HD60M_PATH=/home/hanyu/OS/HD60.img
-#只需要把hd60m.img路径改成自己环境的路径，整个代码直接make all就完全写入了，能够运行成功
-AS=nasm
-CC=gcc
-LD=ld
-LIB= -I lib/ -I lib/kernel/ -I lib/user/ -I kernel/ -I device/ -I thread/
-ASFLAGS= -f elf
-CFLAGS= -Wall $(LIB) -c -fno-builtin -W -Wstrict-prototypes -Wmissing-prototypes -m32
-#-Wall warning all的意思，产生尽可能多警告信息，-fno-builtin不要采用内部函数，
-#-W 会显示警告，但是只显示编译器认为会出现错误的警告
-#-Wstrict-prototypes 要求函数声明必须有参数类型，否则发出警告。-Wmissing-prototypes 必须要有函数声明，否则发出警告
+# 定义变量
+AS = nasm
+CC = gcc
+LD = ld
+DD = dd
+ASFLAGS = -f elf
+CFLAGS = -m32 -I lib/kernel/ -I lib/ -I kernel/ -fno-builtin -fno-stack-protector
+LDFLAGS = -m elf_i386 -Ttext 0xc0001500 -e main
 
-LDFLAGS= -Ttext $(ENTRY_POINT) -e main -Map $(BUILD_DIR)/kernel.map -m elf_i386
-#-Map,生成map文件，就是通过编译器编译之后，生成的程序、数据及IO空间信息的一种映射文件
-#里面包含函数大小，入口地址等一些重要信息
+# 文件路径
+BOOT_DIR = boot
+BUILD_DIR = build
+DEVICE_DIR = device
+KERNEL_DIR = kernel
+LIB_DIR = lib
+IMG = /home/hanyu/OS/HD60.img
 
-OBJS=$(BUILD_DIR)/main.o $(BUILD_DIR)/init.o \
-	$(BUILD_DIR)/interrupt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o \
-	$(BUILD_DIR)/print.o $(BUILD_DIR)/debug.o $(BUILD_DIR)/string.o $(BUILD_DIR)/bitmap.o \
-	$(BUILD_DIR)/memory.o $(BUILD_DIR)/thread.o	$(BUILD_DIR)/list.o	$(BUILD_DIR)/switch.o
-#顺序最好是调用在前，实现在后
+# 目标文件
+KERNEL_OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
+              $(BUILD_DIR)/print.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/timer.o \
+              $(BUILD_DIR)/debug.o $(BUILD_DIR)/memory.o $(BUILD_DIR)/bitmap.o \
+              $(BUILD_DIR)/string.o $(BUILD_DIR)/list.o $(BUILD_DIR)/thread.o \
+              $(BUILD_DIR)/switch.o
 
-######################编译两个启动文件的代码#####################################
-boot:$(BUILD_DIR)/mbr.o $(BUILD_DIR)/loader.o
-$(BUILD_DIR)/mbr.o:boot/mbr.S
-	$(AS) -I boot/include/ -o build/mbr.o boot/mbr.S
-	
-$(BUILD_DIR)/loader.o:boot/loader.S
-	$(AS) -I boot/include/ -o build/loader.o boot/loader.S
-	
-######################编译C内核代码###################################################
-$(BUILD_DIR)/main.o:kernel/main.c
-	$(CC) $(CFLAGS) -o $@ $<	
-# $@表示规则中目标文件名的集合这里就是$(BUILD_DIR)/main.o  $<表示规则中依赖文件的第一个，这里就是kernle/main.c 
+# 默认目标
+all: $(IMG)
 
-$(BUILD_DIR)/init.o:kernel/init.c
-	$(CC) $(CFLAGS) -o $@ $<
+# 编译 MBR 和 Loader
+$(BOOT_DIR)/mbr.bin: $(BOOT_DIR)/mbr.S
+	$(AS) -I $(BOOT_DIR)/include/ -o $@ $<
 
-$(BUILD_DIR)/interrupt.o:kernel/interrupt.c
-	$(CC) $(CFLAGS) -o $@ $<
+$(BOOT_DIR)/loader.bin: $(BOOT_DIR)/loader.S
+	$(AS) -I $(BOOT_DIR)/include/ -o $@ $<
 
-$(BUILD_DIR)/timer.o:device/timer.c
-	$(CC) $(CFLAGS) -o $@ $<
+# 编译内核源文件
+$(BUILD_DIR)/%.o: $(KERNEL_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/debug.o:kernel/debug.c
-	$(CC) $(CFLAGS) -o $@ $<
+$(BUILD_DIR)/%.o: $(DEVICE_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/string.o:lib/string.c
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BUILD_DIR)/bitmap.o:lib/kernel/bitmap.c
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BUILD_DIR)/memory.o:kernel/memory.c
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BUILD_DIR)/thread.o:thread/thread.c
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BUILD_DIR)/list.o:lib/kernel/list.c
-	$(CC) $(CFLAGS) -o $@ $<
-###################编译汇编内核代码#####################################################
-$(BUILD_DIR)/kernel.o:kernel/kernel.S 
+$(BUILD_DIR)/%.o: $(LIB_DIR)/kernel/%.S | $(BUILD_DIR)
 	$(AS) $(ASFLAGS) -o $@ $<
 
-$(BUILD_DIR)/print.o:lib/kernel/print.S
+$(BUILD_DIR)/%.o: $(LIB_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/bitmap.o: $(LIB_DIR)/kernel/bitmap.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/list.o: $(LIB_DIR)/kernel/list.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/string.o: $(LIB_DIR)/string.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/thread.o: thread/thread.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# 编译汇编文件
+$(BUILD_DIR)/print.o: $(LIB_DIR)/kernel/print.S | $(BUILD_DIR)
 	$(AS) $(ASFLAGS) -o $@ $<
 
-$(BUILD_DIR)/switch.o:thread/switch.S
+$(BUILD_DIR)/switch.o: thread/switch.S | $(BUILD_DIR)
 	$(AS) $(ASFLAGS) -o $@ $<
-##################链接所有内核目标文件##################################################
-$(BUILD_DIR)/kernel.bin:$(OBJS)
+
+$(BUILD_DIR)/kernel.o: $(KERNEL_DIR)/kernel.S | $(BUILD_DIR)
+	$(AS) $(ASFLAGS) -o $@ $<
+
+# 链接内核
+$(BUILD_DIR)/kernel.bin: $(KERNEL_OBJS)
 	$(LD) $(LDFLAGS) -o $@ $^
-# $^表示规则中所有依赖文件的集合，如果有重复，会自动去重
 
-.PHONY:mk_dir hd clean build all boot	#定义了6个伪目标
-mk_dir:
-	if [ ! -d $(BUILD_DIR) ];then mkdir $(BUILD_DIR);fi 
-#判断build文件夹是否存在，如果不存在，则创建
+# 写入磁盘镜像
+$(IMG): $(BOOT_DIR)/mbr.bin $(BOOT_DIR)/loader.bin $(BUILD_DIR)/kernel.bin
+	$(DD) if=$(BOOT_DIR)/mbr.bin of=$(IMG) bs=512 count=1 conv=notrunc
+	$(DD) if=$(BOOT_DIR)/loader.bin of=$(IMG) bs=512 count=4 seek=2 conv=notrunc
+	$(DD) if=$(BUILD_DIR)/kernel.bin of=$(IMG) bs=512 count=200 seek=9 conv=notrunc
 
-hd:
-	dd if=build/mbr.o of=$(HD60M_PATH) count=1 bs=512 conv=notrunc && \
-	dd if=build/loader.o of=$(HD60M_PATH) count=4 bs=512 seek=2 conv=notrunc && \
-	dd if=$(BUILD_DIR)/kernel.bin of=$(HD60M_PATH) bs=512 count=200 seek=9 conv=notrunc
-	
+# 启动 Bochs 模拟器
+bochs:
+	bochs -f /home/hanyu/OS/bochsrc.disk -q
+
+# 清理生成的文件
 clean:
-	@cd $(BUILD_DIR) && rm -f ./* && echo "remove ./build all done"
-#-f, --force忽略不存在的文件，从不给出提示，执行make clean就会删除build下所有文件
+	rm -f $(BUILD_DIR)/*.o $(BUILD_DIR)/kernel.bin $(BOOT_DIR)/*.bin
+	rm -f $(BUILD_DIR)/*.bin
 
-build:$(BUILD_DIR)/kernel.bin
-	
-#执行build需要依赖kernel.bin，但是一开始没有，就会递归执行之前写好的语句编译kernel.bin
-
-all:mk_dir boot build hd
-#make all 就是依次执行mk_dir build hd
+.PHONY: all clean bochs
