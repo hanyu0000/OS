@@ -1,5 +1,7 @@
 #include "memory.h"
+#include "bitmap.h"
 #include "debug.h"
+#include "global.h"
 #include "print.h"
 #include "stdint.h"
 #include "string.h"
@@ -18,10 +20,8 @@ struct pool {
     uint32_t pool_size;         //字节容量
 };
 
-struct pool kernel_pool, user_pool;
-//为kernel与user分别建立物理内存池，让用户进程只能从user内存池获得新的内存空间，防止用户申请完所有可用空间，内核就不能申请
-struct virtual_addr kernel_vaddr;
-//管理内核虚拟地址空间
+struct pool kernel_pool, user_pool;//为kernel与user分别建立物理内存池，让用户进程只能从user内存池获得新的内存空间，防止用户申请完所有可用空间，内核就不能申请
+struct virtual_addr kernel_vaddr;//管理内核虚拟地址空间
 
 //初始化内核物理内存池与用户物理内存池
 static void mem_pool_init(uint32_t all_mem) {
@@ -96,7 +96,7 @@ static void* vaddr_get(enum pool_flags pf,uint32_t pg_cnt){
     int vaddr_start = 0, bit_idx_start = -1;
     uint32_t cnt = 0;
     if(pf == PF_KERNEL){
-        bit_idx_start == bitmap_scan(&kernel_vaddr.vaddr_bitmap, pg_cnt);
+        bit_idx_start = bitmap_scan(&kernel_vaddr.vaddr_bitmap, pg_cnt);
         if(bit_idx_start == -1)
             return NULL;
         while(cnt < pg_cnt)
@@ -120,8 +120,8 @@ static void* palloc(struct pool* m_pool) {
     return (void*)page_phyaddr;
 }
 
-#define PDE_IDX(addr) ((addr & 0xffc00000) >> 22)
-#define PTE_IDX(addr) ((addr & 0x003ff000) >> 12)
+#define PDE_IDX(addr) ((addr & 0xffc00000) >> 22)// 最高10位的掩码
+#define PTE_IDX(addr) ((addr & 0x003ff000) >> 12)// 中间10位的掩码
 
 //得到虚拟地址vaddr对应的pde的指针
 uint32_t* pde_ptr(uint32_t vaddr) {
@@ -151,7 +151,7 @@ static void page_table_add(void* _vaddr, void* _page_phyaddr) {
    	if (*pde & 0x00000001) {    // 页目录项和页表项的第0位为P,此处判断目录项是否存在
         ASSERT(!(*pte & 0x00000001));
 
-        if (!(*pte & 0x00000001))// 只要是创建页表,pte就应该不存在,多判断一下放心
+        if (!(*pte & 0x00000001))// 只要是创建页表,pte就应该不存在,多判断一下
             *pte = (page_phyaddr | PG_US_U | PG_RW_W | PG_P_1);    // US=1,RW=1,P=1
         else {          //应该不会执行到这，因为上面的ASSERT会先执行
             PANIC("pte repeat");
@@ -175,7 +175,7 @@ static void page_table_add(void* _vaddr, void* _page_phyaddr) {
 
 //分配pg_cnt个页空间,成功则返回起始虚拟地址,失败
 void* malloc_page(enum pool_flags pf, uint32_t pg_cnt) {
-   	ASSERT(pg_cnt > 0 && pg_cnt < 3840);
+    ASSERT(pg_cnt > 0 && pg_cnt <= 1024);
 /***********   malloc_page的原理是三个动作的合成:   ***********
       1通过vaddr_get在虚拟内存池中申请虚拟地址
       2通过palloc在物理内存池中申请物理页
@@ -196,12 +196,12 @@ void* malloc_page(enum pool_flags pf, uint32_t pg_cnt) {
         }
         page_table_add((void*)vaddr, page_phyaddr); //在页表中做映射
         vaddr += PG_SIZE;//下一个虚拟页
-   	}
-   	return vaddr_start;
+    }
+    return vaddr_start;
 }
 
 //从内核物理内存池中申请pg_cnt页内存,成功则返回其虚拟地址,失败则返回NULL
-void* get_kernel_pages(uint32_t pg_cnt) {
+void *get_kernel_pages(uint32_t pg_cnt) {
     void* vaddr =  malloc_page(PF_KERNEL, pg_cnt);
     if (vaddr != NULL) {    // 若分配的地址不为空,将页框清0后返回
         memset(vaddr, 0, pg_cnt * PG_SIZE);

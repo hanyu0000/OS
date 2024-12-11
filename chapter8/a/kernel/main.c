@@ -1,7 +1,7 @@
 #include "print.h"
 #include "init.h"
 #include "memory.h"
-void main(void) {
+int  main(void) {
    put_str("I am kernel\n");
    init_all();
 
@@ -11,5 +11,5 @@ void main(void) {
    put_str("\n");
 
    while(1);
-   return;
+   return 0;
 }

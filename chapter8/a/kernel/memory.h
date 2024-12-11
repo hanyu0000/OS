@@ -27,8 +27,4 @@ enum pool_flags {
 };
 
 void* get_kernel_pages(uint32_t pg_cnt);
-void* malloc_page(enum pool_flags pf, uint32_t pg_cnt);
-void malloc_init(void);
-uint32_t* pte_ptr(uint32_t vaddr);
-uint32_t* pde_ptr(uint32_t vaddr);
 #endif
