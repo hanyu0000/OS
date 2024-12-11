@@ -19,12 +19,10 @@ void mem_init(void);
 #define	 PG_US_S  0	// U/S 属性位值, 系统级
 #define	 PG_US_U  4	// U/S 属性位值, 用户级
 
-
 //内存池标记,用于判断用哪个内存池
 enum pool_flags {
    PF_KERNEL = 1,    // 内核内存池
    PF_USER = 2       // 用户内存池
 };
-
 void* get_kernel_pages(uint32_t pg_cnt);
 #endif
