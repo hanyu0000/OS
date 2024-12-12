@@ -1,89 +1,81 @@
-# 定义变量
+# 变量定义
+BUILD_DIR = build
+BOOT_DIR = boot
+KERNEL_DIR = kernel
+DEVICE_DIR = device
+LIB_DIR = lib
+THREAD_DIR = thread
+OUTPUT_IMG = /home/hanyu/OS/HD60.img
+BOCHS_CONFIG = /home/hanyu/OS/bochsrc.disk
+ENTRY_POINT = 0xc0001500
+
 AS = nasm
 CC = gcc
 LD = ld
-DD = dd
-ASFLAGS = -f elf
-CFLAGS = -m32 -I lib/kernel/ -I lib/ -I kernel/ -fno-builtin -fno-stack-protector
-LDFLAGS = -m elf_i386 -Ttext 0xc0001500 -e main
+ASFLAGS = -I $(BOOT_DIR)/include/ -f elf
+CFLAGS = -m32 -I $(LIB_DIR)/kernel/ -I $(LIB_DIR)/ -I $(KERNEL_DIR)/ \
+         -c -fno-builtin -fno-stack-protector
+LDFLAGS = -m elf_i386 -Ttext $(ENTRY_POINT) -e main
 
-# 文件路径
-BOOT_DIR = boot
-BUILD_DIR = build
-DEVICE_DIR = device
-KERNEL_DIR = kernel
-LIB_DIR = lib
-IMG = /home/hanyu/OS/HD60.img
+BOOT_OBJS = $(BUILD_DIR)/mbr.bin $(BUILD_DIR)/loader.bin
+KERNEL_OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/interrupt.o $(BUILD_DIR)/init.o \
+              $(BUILD_DIR)/timer.o $(BUILD_DIR)/debug.o $(BUILD_DIR)/memory.o \
+              $(BUILD_DIR)/bitmap.o $(BUILD_DIR)/list.o $(BUILD_DIR)/string.o \
+              $(BUILD_DIR)/thread.o $(BUILD_DIR)/print.o $(BUILD_DIR)/switch.o \
+              $(BUILD_DIR)/kernel.o
 
-# 目标文件
-KERNEL_OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
-              $(BUILD_DIR)/print.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/timer.o \
-              $(BUILD_DIR)/debug.o $(BUILD_DIR)/memory.o $(BUILD_DIR)/bitmap.o \
-              $(BUILD_DIR)/string.o $(BUILD_DIR)/list.o $(BUILD_DIR)/thread.o \
-              $(BUILD_DIR)/switch.o
+# 目标规则
+.PHONY: all clean run
 
-# 默认目标
-all: $(IMG)
+all: $(OUTPUT_IMG)
 
-# 编译 MBR 和 Loader
-$(BOOT_DIR)/mbr.bin: $(BOOT_DIR)/mbr.S
+# 编译引导程序
+$(BUILD_DIR)/mbr.bin: $(BOOT_DIR)/mbr.S
 	$(AS) -I $(BOOT_DIR)/include/ -o $@ $<
 
-$(BOOT_DIR)/loader.bin: $(BOOT_DIR)/loader.S
+$(BUILD_DIR)/loader.bin: $(BOOT_DIR)/loader.S
 	$(AS) -I $(BOOT_DIR)/include/ -o $@ $<
 
-# 编译内核源文件
-$(BUILD_DIR)/%.o: $(KERNEL_DIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
+# 编译 C 源文件
+$(BUILD_DIR)/%.o: $(KERNEL_DIR)/%.c
+	$(CC) $(CFLAGS) -o $@ $<
 
-$(BUILD_DIR)/%.o: $(DEVICE_DIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(DEVICE_DIR)/%.c
+	$(CC) $(CFLAGS) -o $@ $<
 
-$(BUILD_DIR)/%.o: $(LIB_DIR)/kernel/%.S | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: $(LIB_DIR)/%.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(BUILD_DIR)/%.o: $(LIB_DIR)/kernel/%.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(BUILD_DIR)/%.o: $(THREAD_DIR)/%.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+# 编译汇编源文件
+$(BUILD_DIR)/%.o: $(KERNEL_DIR)/%.S
 	$(AS) $(ASFLAGS) -o $@ $<
 
-$(BUILD_DIR)/%.o: $(LIB_DIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/bitmap.o: $(LIB_DIR)/kernel/bitmap.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/list.o: $(LIB_DIR)/kernel/list.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/string.o: $(LIB_DIR)/string.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/thread.o: thread/thread.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-# 编译汇编文件
-$(BUILD_DIR)/print.o: $(LIB_DIR)/kernel/print.S | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: $(LIB_DIR)/kernel/%.S
 	$(AS) $(ASFLAGS) -o $@ $<
 
-$(BUILD_DIR)/switch.o: thread/switch.S | $(BUILD_DIR)
-	$(AS) $(ASFLAGS) -o $@ $<
-
-$(BUILD_DIR)/kernel.o: $(KERNEL_DIR)/kernel.S | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: $(THREAD_DIR)/%.S
 	$(AS) $(ASFLAGS) -o $@ $<
 
 # 链接内核
 $(BUILD_DIR)/kernel.bin: $(KERNEL_OBJS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
-# 写入磁盘镜像
-$(IMG): $(BOOT_DIR)/mbr.bin $(BOOT_DIR)/loader.bin $(BUILD_DIR)/kernel.bin
-	$(DD) if=$(BOOT_DIR)/mbr.bin of=$(IMG) bs=512 count=1 conv=notrunc
-	$(DD) if=$(BOOT_DIR)/loader.bin of=$(IMG) bs=512 count=4 seek=2 conv=notrunc
-	$(DD) if=$(BUILD_DIR)/kernel.bin of=$(IMG) bs=512 count=200 seek=9 conv=notrunc
-
-# 启动 Bochs 模拟器
-bochs:
-	bochs -f /home/hanyu/OS/bochsrc.disk -q
+# 写入硬盘镜像
+$(OUTPUT_IMG): $(BOOT_OBJS) $(BUILD_DIR)/kernel.bin
+	dd if=$(BUILD_DIR)/mbr.bin of=$(OUTPUT_IMG) bs=512 count=1 conv=notrunc
+	dd if=$(BUILD_DIR)/loader.bin of=$(OUTPUT_IMG) bs=512 count=4 seek=2 conv=notrunc
+	dd if=$(BUILD_DIR)/kernel.bin of=$(OUTPUT_IMG) bs=512 count=200 seek=9 conv=notrunc
 
 # 清理生成的文件
 clean:
-	rm -f $(BUILD_DIR)/*.o $(BUILD_DIR)/kernel.bin $(BOOT_DIR)/*.bin
-	rm -f $(BUILD_DIR)/*.bin
+	rm -f $(BUILD_DIR)/*
 
-.PHONY: all clean bochs
+# 运行 Bochs 模拟器
+run: all
+	bochs -f $(BOCHS_CONFIG) -q

@@ -68,9 +68,10 @@ static void idt_desc_init(void) {
       make_idt_desc(&idt[i], IDT_DESC_ATTR_DPL0, intr_entry_table[i]); 
    put_str("   idt_desc_init done\n");
 }
+
 //通用的中断处理函数,用于初始化,一般用在异常出现时的处理
 static void general_intr_handler(uint8_t vec_nr) {
-   if (vec_nr == 0x27 || vec_nr == 0x2f)        //伪中断向量，无需处理
+   if (vec_nr == 0x27 || vec_nr == 0x2f)        //IRQ7 和 IRQ15 会产生伪中断，无需处理
       return;
    //将光标置0,从屏幕左上角清出一片打印异常信息的区域，方便阅读
    set_cursor(0);
@@ -86,8 +87,7 @@ static void general_intr_handler(uint8_t vec_nr) {
    if (vec_nr == 14) {  // 若为Pagefault,将缺失的地址打印出来并悬停
       int page_fault_vaddr = 0;
       asm ("movl %%cr2, %0" : "=r" (page_fault_vaddr));     // cr2是存放造成page_fault的地址
-      put_str("\npage fault addr is ");
-      put_int(page_fault_vaddr); 
+      put_str("\npage fault addr is ");put_int(page_fault_vaddr);
    }
    put_str("\n!!!!!!!   excetion message end   !!!!!!!!\n");
   //能进入中断处理程序就表示已经处在关中断情况下,
@@ -164,10 +164,10 @@ enum intr_status intr_set_status(enum intr_status status) {
    return status & INTR_ON ? intr_enable() : intr_disable();   //enable与disable函数会返回旧中断状态
 }
 
-//在中断处理程序数组第vector_no个元素中注册安装中断处理程序function
+//功能是在中断处理程序数组第vector_no个元素中注册安装中断处理程序function
+//vector_no 是中断向量号，function 是中断处理程序
 void register_handler(uint8_t vector_no, intr_handler function) {
-/* idt_table数组中的函数是在进入中断后根据中断向量号调用的,
- * 见kernel/kernel.S的call [idt_table + %1*4] */
+   //idt_table数组中的函数是在进入中断后根据中断向量号调用的,见kernel/kernel.S的call [idt_table + %1*4]
    idt_table[vector_no] = function;
 }
 

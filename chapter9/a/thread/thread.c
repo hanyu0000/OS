@@ -10,55 +10,52 @@
 
 #define PG_SIZE 4096
 
-struct task_struct* main_thread;      // 主线程pcb
-struct list thread_ready_list;        // 就绪队列
+struct task_struct* main_thread;      // 主线程pcb(进程控制块)
+struct list thread_ready_list;        // 就绪队列,每创建一个线程就将其加到此队列,就绪队列中的线程可以直接上处理器
 struct list thread_all_list;          // 任务队列
 static struct list_elem* thread_tag;  // 用于保存队列中的线程节点
 
 extern void switch_to(struct task_struct* cur, struct task_struct* next);
 
-// 获取当前线程pcb指针
+//获取当前线程pcb指针
 struct task_struct* running_thread() {
     uint32_t esp;
     asm("mov %%esp, %0" : "=g"(esp));
-    // 取esp整数部分即pcb起始地址
+    //取esp整数部分即pcb起始地址
     return (struct task_struct*)(esp & 0xfffff000);
 }
 
-// 由kernel_thread去执行function(func_arg),这个函数就是线程中去开启我们要运行的函数
+//由kernel_thread去执行function(func_arg),这个函数就是线程中去开启我们要运行的函数
 static void kernel_thread(thread_func* function, void* func_arg) {
-    // 执行function前要开中断,避免后面的时钟中断被屏蔽,而无法调度其它线程
+    //执行function前要开中断,避免后面的时钟中断被屏蔽,而无法调度其它线程
     intr_enable();
     function(func_arg);
 }
 
-// 用于根据传入的线程的pcb地址，要运行的函数地址，函数的参数地址来初始化线程中断运行信息，核心就是要填入要运行的函数地址与参数
+//用于根据传入的线程的pcb地址，要运行的函数地址，函数的参数地址来初始化线程中断运行信息，核心就是要填入要运行的函数地址与参数
 void thread_create(struct task_struct* pthread,thread_func function,void* func_arg) {
-    // 先预留中断使用栈的空间,可见thread.h中定义的结构
-    /*
-    pthread->self_kstack -= sizeof(struct intr_stack);
-    -= 结果是sizeof(struct intr_stack)的4倍
-    self_kstack类型为uint32_t*，也就是一个明确指向uint32_t类型值的地址，那么加减操作，都是会是sizeof(uint32_t)
-    = 4 的倍数
-    */
+    //先预留中断使用栈的空间,可见thread.h中定义的结构
+    //pthread->self_kstack -= sizeof(struct intr_stack);
+    //-= 结果是sizeof(struct intr_stack)的4倍
+    //self_kstack类型为uint32_t*，也就是一个明确指向uint32_t类型值的地址，那么加减操作，都是会是sizeof(uint32_t)
+    //= 4 的倍数
     pthread->self_kstack = (uint32_t*)((int)(pthread->self_kstack) - sizeof(struct intr_stack));
 
-    // 再留出线程空间，可见thread.h中定义
-    // pthread->self_kstack -= sizeof(struct thread_stack);
+    //再留出线程空间，可见thread.h中定义
+    //pthread->self_kstack -= sizeof(struct thread_stack);
     pthread->self_kstack = (uint32_t*)((int)(pthread->self_kstack) - sizeof(struct thread_stack));
     struct thread_stack* kthread_stack = (struct thread_stack*)pthread->self_kstack;
-    // 我们已经留出了线程栈的空间,现在将栈顶变成一个线程栈结构体。指针,方便我们提前布置数据达到我们想要的目的
+    //我们已经留出了线程栈的空间,现在将栈顶变成一个线程栈结构体。指针,方便我们提前布置数据达到我们想要的目的
     kthread_stack->eip = kernel_thread;
-    // 将线程的栈顶指向这里,并ret,就能直接跳入线程启动器开始执行
-    // 为什么这里不能直接填传入进来的func，这也是函数地址啊，为什么还非要经过一个启动器呢？其实是可以不经过线程启动器的
+    //将线程的栈顶指向这里,并ret,就能直接跳入线程启动器开始执行
 
-    // 用不着,所以不用初始化这个返回地址kthread_stack->unused_retaddr
+    //用不着,所以不用初始化这个返回地址kthread_stack->unused_retaddr
     kthread_stack->function = function;
     kthread_stack->func_arg = func_arg;
     kthread_stack->ebp = kthread_stack->ebx = kthread_stack->edi = 0;
 }
 
-// 初始化线程基本信息,pcb中存储的是线程的管理信息,此函数用于根据传入的pcb的地址,线程的名字等
+//初始化线程基本信息,pcb中存储的是线程的管理信息,此函数用于根据传入的pcb的地址,线程的名字等
 void init_thread(struct task_struct* pthread, char* name, int prio) {
     memset(pthread, 0, sizeof(*pthread));  // 把pcb初始化为0
     strcpy(pthread->name, name);  // 将传入的线程的名字填入线程的pc
@@ -68,18 +65,17 @@ void init_thread(struct task_struct* pthread, char* name, int prio) {
     else
       pthread->status = TASK_READY;
 
-    pthread->priority = prio;
-
     //self_kstack是线程自己在内核态下使用的栈顶地址
+    pthread->priority = prio;
     pthread->ticks = prio;
     pthread->elapsed_ticks = 0;
     pthread->pgdir = NULL;              //线程没有自己的地址空间，进程的pcb这一项才有用，指向自己的页表虚拟地址
     pthread->self_kstack = (uint32_t*)((uint32_t)pthread + PG_SIZE);  // 本操作系统比较简单,线程不会太大,就将线程栈顶定义为pcb地址。+4096的地方，这样就留了一页给线程的信息（包含管理信息与运行信息）空间
     pthread->stack_magic = 0X19870916;  // 定义的边界数字，随便选的数字来判断线程的栈是否已经生长到覆盖pcb信息
 }
-// 创建一优先级为prio的线程,线程名为name,线程所执行的函数是function(func_arg)
-struct task_struct* thread_start(char* name,int prio,thread_func function,void* func_arg) {
-    // pcb都位于内核空间,包括用户进程的pcb
+//创建一优先级为prio的线程,线程名为name,线程所执行的函数是function(func_arg)
+struct task_struct* thread_start(char* name, int prio,thread_func function, void* func_arg) {
+    //pcb都位于内核空间,包括用户进程的pcb
     struct task_struct* thread = get_kernel_pages(1);  // 为线程的pcb申请4k空间的起始地址
     init_thread(thread, name, prio);            // 初始化线程的pcb
     thread_create(thread, function, func_arg);  // 初始化线程的线程栈
@@ -93,24 +89,22 @@ struct task_struct* thread_start(char* name,int prio,thread_func function,void* 
     ASSERT(!elem_find(&thread_all_list, &thread->all_list_tag));
     //加入全部线程队列
     list_append(&thread_all_list, &thread->all_list_tag);
-
     return thread;
 }
 
-// 将kernel中的main函数完善为主线程
+//将kernel中的main函数完善为主线程
 static void make_main_thread(void) {
-    // 因为main线程早已运行,咱们在loader.S中进入内核时的mov
-    // esp,0xc009f000,就是为其预留了tcb,地址为0xc009e000,因此不需要通过get_kernel_page另分配一页
+    //因为main线程早已运行,咱们在loader.S中进入内核时的mov esp,0xc009f000,就是为其预留了tcb,地址为0xc009e000,因此不需要通过get_kernel_page另分配一页
     main_thread = running_thread();
     init_thread(main_thread, "main", 31);
 
-    /* main函数是当前线程,当前线程不在thread_ready_list中,
-     * 所以只将其加在thread_all_list中. */
+    //main函数是当前线程,当前线程不在thread_ready_list中,所以只将其加在thread_all_list中
     ASSERT(!elem_find(&thread_all_list, &main_thread->all_list_tag));
     list_append(&thread_all_list, &main_thread->all_list_tag);
 }
 
-// 实现任务调度
+//实现任务调度
+//功能是将当前线程换下处理器，并在就绪队列中找出下个可运行的程序将其换上处理器。schedule 主要内容就是读写就绪队列，因此不需要参数
 void schedule() {
     ASSERT(intr_get_status() == INTR_OFF);
     struct task_struct* cur = running_thread();

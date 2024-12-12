@@ -38,12 +38,9 @@ static void frequency_set(uint8_t counter_port, \
 //时钟中断处理函数
 static void intr_timer_handler(void){
     struct task_struct* cur_thread = running_thread();
-
     ASSERT(cur_thread->stack_magic == 0x19870916);//检查栈是否溢出
-
     cur_thread->elapsed_ticks++; //记录此线程占用的cpu时间
     ticks++;
-
     if(cur_thread->ticks == 0)   //若进程时间片用完就开始调度新的进程上cpu
       schedule();
     else                         //将当前进程的时间片-1

@@ -9,7 +9,7 @@ void list_init(struct list* list) {
     list->tail.next = NULL;
 }
 
-// 把链表元素elem插入在元素before之前
+//把链表元素elem插入在元素before之前
 void list_insert_before(struct list_elem* before, struct list_elem* elem) {
     //未来这个链表结点插入是用于修改task_struck队列的，这是个公共资源，所以需要不被切换走
     enum intr_status old_status = intr_disable();
@@ -23,9 +23,7 @@ void list_insert_before(struct list_elem* before, struct list_elem* elem) {
 
     //更新before的前驱结点为elem
     before->prev = elem;
-
-    intr_set_status(
-        old_status);  //关中断之前是开着，那么就重新打开中断，如果关着，那么就继续关着
+    intr_set_status(old_status);  //关中断之前是开着，那么就重新打开中断，如果关着，那么就继续关着
 }
 
 //添加元素到列表队首,类似栈push操作，添加结点到链表队首，类似于push操作, 参数1是链表的管理结点，参数2是一个新结点
@@ -69,8 +67,8 @@ bool elem_find(struct list* plist,struct list_elem* obj_elem){
 /* 把列表plist中的每个元素elem和arg传给回调函数func
  * arg给func用来判断elem是否符合条件
  * 本函数的功能是遍历列表内所有元素,逐个判断是否有符合条件的元素
- * 找到符合条件的元素返回元素指针,否则返回NULL.*/
-struct list_elem* list_traversal (struct list* plist,function func,int arg){
+ * 找到符合条件的元素返回元素指针,否则返回NULL*/
+struct list_elem* list_traversal(struct list* plist,function func,int arg){
     struct list_elem* elem = plist->head.next;
     //若队列为空，直接返回NULL
     if(list_empty(plist))

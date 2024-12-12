@@ -96,7 +96,7 @@ static void* vaddr_get(enum pool_flags pf,uint32_t pg_cnt){
     int vaddr_start = 0, bit_idx_start = -1;
     uint32_t cnt = 0;
     if(pf == PF_KERNEL){
-        bit_idx_start == bitmap_scan(&kernel_vaddr.vaddr_bitmap, pg_cnt);
+        bit_idx_start = bitmap_scan(&kernel_vaddr.vaddr_bitmap, pg_cnt);
         if(bit_idx_start == -1)
             return NULL;
         while(cnt < pg_cnt)
