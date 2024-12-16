@@ -3,8 +3,7 @@
 #include "stdint.h"
 #include "list.h"
 
-//定义一种thread_fun的函数类型，返回值是空，参数是一个地址(用来指向自己的参数)
-//这样定义，这个类型就能够具有很大的通用性，很多函数都是这个类型
+//自定义通用函数类型:定义一种thread_fun的函数类型，返回值是空，参数是一个地址(用来指向自己的参数)
 typedef void thread_func(void*);
 
 //进程或者线程的状态
@@ -39,7 +38,7 @@ struct  intr_stack{
     uint32_t ds;
 
 
-//以下由 cpu 从低特权级进入高特权级时压入
+    //以下由 cpu 从低特权级进入高特权级时压入
     uint32_t err_code;      //err_code 会被压入在 eip 之后
     void (*eip) (void);
     uint32_t cs;
@@ -54,23 +53,28 @@ struct  intr_stack{
 * 仅用在 switch_to 时保存线程环境
 * 实际位置取决于实际运行情况
 ******************************************************/
+//要在汇编代码 switch_to 中保存寄存器，保存的位置就是这个线程栈
 struct thread_stack{
     uint32_t ebp;
     uint32_t ebx;
     uint32_t edi;
     uint32_t esi;
 
-//这个位置会放一个名叫eip,返回void的函数指针(*epi的*决定了这是个指针),该函数传入的参数是一个thread_func类型的函数指针与函数的参数地址,该线程第一次执行时,eip指向待调用的函数kernel_thread,其他时候,eip是指向switch_to的返回地址
+    //这个位置会放一个名叫eip,返回void的函数指针(*epi的*决定了这是个指针)
+    //该函数传入的参数是一个thread_func类型的函数指针与函数的参数地址
+    //该线程第一次执行时,eip指向待调用的函数kernel_thread,其他时候,eip是指向switch_to的返回地址
+    //线程是使函数单独上处理器运行的机制，因此线程肯定得知道要运行哪个函数，首次执行某个函数时，这个栈就用来保存待运行的函数
+    //其中 eip 便是该函数的地址,将来用 switch_to 函数实现任务切换，当任务切换时，此 eip 用于保存任务切换后的新任务的返回地址
     void (*eip)(thread_func* func, void* func_arg);
 
-/********** 以下仅供第一次被调度上 cpu 时使用 **********/
-//参数 unused_ret 只为占位置充数为返回地址
+/********** 以下仅供第一次被调度上cpu时使用 **********/
+    //参数 unused_ret 只为占位置充数为返回地址
     void (*unused_retaddr);
     thread_func* function;          //由 kernel_thread 所调用的函数地址
     void* func_arg;                 //由 kernel_thread 所调用的函数参数地址
 };
 
-//进程或线程的pcb,程序控制块,此结构体用于存储线程的管理信息
+//进程或线程的pcb,此结构体用于存储线程的管理信息
 struct task_struct {
     uint32_t* self_kstack;          //各内核线程都用自己的内核栈
     enum task_status status;
