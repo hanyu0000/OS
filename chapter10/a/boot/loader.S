@@ -23,12 +23,12 @@ VIDEO_DESC:
     SELECTOR_VIDEO equ (0x0003<<3) + TI_GDT + RPL0      ;同上
 
 total_mem_bytes dd 0                                    ;total_mem_bytes用于保存内存容量,以字节为单位
-                                                        ;当前偏移loader.bin文件头0x200字节,loader.bin的加载地址是0x900,
+                                                        ;当前偏移loader.bin文件头0x200(512)字节,loader.bin的加载地址是0x900,
                                                         ;故total_mem_bytes内存中的地址是0xb00,以便在内核中引用此地址
 gdt_ptr dw GDT_LIMIT                                    ;定义加载进入GDTR的数据，前2字节是gdt界限，后4字节是gdt起始地址
         dd  GDT_BASE
 
-ards_buf times 244 db 0                                 ;total_mem_bytes4字节+gdt_ptr6字节+ards_buf244字节+ards_nr2,共256字节
+ards_buf times 244 db 0                                 ;人工对齐，total_mem_bytes4字节+gdt_ptr6字节+ards_buf244字节+ards_nr2,共256字节
 ards_nr dw 0                                            ;用于记录ards结构体数量
 
 loader_start:
